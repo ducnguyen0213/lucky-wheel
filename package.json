@@ -2,6 +2,9 @@
   "name": "lucky-wheel",
   "version": "1.0.0",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "scripts": {
     "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
