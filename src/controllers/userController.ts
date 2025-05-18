@@ -68,7 +68,7 @@ export const checkUser = async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    const { email, phone, codeShop } = req.body;
+    const { email, phone, codeShop, address } = req.body;
 
     // Tìm người dùng theo email hoặc số điện thoại
     let user = await User.findOne({
@@ -80,6 +80,12 @@ export const checkUser = async (req: Request, res: Response): Promise<void> => {
       // Cập nhật codeShop nếu chưa có
       if (!user.codeShop && codeShop) {
         user.codeShop = codeShop;
+        await user.save();
+      }
+      
+      // Cập nhật address nếu được cung cấp
+      if (address && (user.address !== address)) {
+        user.address = address;
         await user.save();
       }
       
@@ -132,7 +138,7 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
   }
 
   try {
-    const { name, email, phone, codeShop } = req.body;
+    const { name, email, phone, codeShop, address } = req.body;
 
     // Tìm người dùng theo email hoặc số điện thoại
     let user = await User.findOne({
@@ -145,6 +151,7 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
       user.email = email;
       user.phone = phone;
       user.codeShop = codeShop;
+      if (address) user.address = address;
       await user.save();
     } else {
       // Tạo người dùng mới
@@ -152,7 +159,8 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
         name,
         email,
         phone,
-        codeShop
+        codeShop,
+        address
       });
     }
 
@@ -182,6 +190,7 @@ export const exportUsers = async (req: Request, res: Response): Promise<void> =>
       name: user.name,
       email: user.email,
       phone: user.phone,
+      address: user.address,
       codeShop: user.codeShop,
       spinsToday: user.spinsToday,
       lastSpinDate: user.lastSpinDate,

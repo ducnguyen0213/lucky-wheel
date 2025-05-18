@@ -3,6 +3,7 @@ import { validationResult } from 'express-validator';
 import User from '../models/User';
 import Prize from '../models/Prize';
 import Spin from '../models/Spin';
+import { checkAndSendWinningEmail } from '../utils/emailService';
 
 // @desc    Quay thưởng
 // @route   POST /api/spins
@@ -120,6 +121,14 @@ export const spin = async (req: Request, res: Response): Promise<void> => {
 
     // Populate prize details
     const spinWithPrize = await Spin.findById(spin._id).populate('prize');
+    
+    // Kiểm tra và gửi email nếu đủ điều kiện
+    if (user.spinsToday >= 5 && user.email) {
+      // Gửi email bất đồng bộ để không ảnh hưởng đến response
+      checkAndSendWinningEmail(user).catch((err: Error) => {
+        console.error('Lỗi gửi email:', err);
+      });
+    }
 
     res.status(200).json({
       success: true,

@@ -7,6 +7,7 @@ export interface IUser extends Document {
   email: string;
   phone: string;
   codeShop: string;
+  address: string;
   spinsToday: number;
   lastSpinDate: Date;
   createdAt: Date;
@@ -42,6 +43,11 @@ const UserSchema: Schema = new Schema({
     type: String,
     required: [true, 'Vui lòng nhập mã cửa hàng'],
     trim: true
+  },
+  address: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Địa chỉ không quá 500 ký tự']
   },
   spinsToday: {
     type: Number,
