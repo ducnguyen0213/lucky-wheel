@@ -22,10 +22,32 @@ const app = express();
 // Thiết lập CORS để cho phép credentials (cookies)
 app.use(cors({
   origin: function(origin, callback) {
-    // Cho phép tất cả nguồn gốc (origins)
-    callback(null, true);
+    // Trong môi trường development, origin có thể là null
+    if (!origin || /localhost/.test(origin)) {
+      callback(null, true);
+      return;
+    }
+    
+    // Danh sách các domain được phép
+    const allowedOrigins = [
+      'https://lucky-wheel-cicl.onrender.com',
+      'https://luck-wheel-fe.vercel.app/',
+      'http://localhost:3000',
+      'http://localhost:5000',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5000'
+    ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked:', origin);
+      callback(null, true); // Cho phép tạm thời để debug
+    }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Middleware

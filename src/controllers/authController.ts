@@ -104,8 +104,20 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 // @access  Public
 export const refreshTokenHandler = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Lấy refresh token từ cookie
-    const refreshToken = req.cookies.refreshToken;
+    // Lấy refresh token từ cookie, hoặc từ body, hoặc từ query params, hoặc từ header
+    const refreshToken = req.cookies.refreshToken || 
+                        req.signedCookies.refreshToken ||
+                        req.body.refreshToken ||
+                        req.query.refreshToken as string ||
+                        req.headers.authorization?.split(' ')[1] ||
+                        '';
+    
+    console.log('Refresh token request received:', { 
+      cookies: req.cookies,
+      signedCookies: req.signedCookies,
+      headers: req.headers,
+      refreshToken: refreshToken ? 'present' : 'missing'
+    });
     
     if (!refreshToken) {
       res.status(401).json({
@@ -303,7 +315,7 @@ const setRefreshTokenCookie = (res: Response, token: string): void => {
     secure: process.env.NODE_ENV === 'production', // Chỉ sử dụng HTTPS trong production
     signed: process.env.JWT_SECRET ? true : false, // Chỉ dùng signed cookies khi có JWT_SECRET
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 ngày
-    sameSite: 'strict' as const
+    sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax'
   };
 
   res.cookie('refreshToken', token, cookieOptions);
