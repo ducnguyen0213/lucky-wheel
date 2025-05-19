@@ -9,6 +9,7 @@ import {
   deletePrize
 } from '../controllers/prizeController';
 import { protect, authorize } from '../middleware/auth';
+import { paginate } from '../middleware/paginate';
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ const prizeValidation = [
 ];
 
 // Admin routes - đặt trước routes có params
-router.get('/admin/all', protect, authorize, getAllPrizes);
+router.get('/admin/all', protect, authorize, paginate, getAllPrizes);
 router.post('/', protect, authorize, prizeValidation, createPrize);
 
 // Public routes

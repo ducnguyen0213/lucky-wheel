@@ -7,6 +7,7 @@ import {
   getSpinStats
 } from '../controllers/spinController';
 import { protect, authorize } from '../middleware/auth';
+import { paginate } from '../middleware/paginate';
 
 const router = express.Router();
 
@@ -17,10 +18,10 @@ const spinValidation = [
 
 // Public routes
 router.post('/', spinValidation, spin);
-router.get('/user/:userId', getUserSpins);
+router.get('/user/:userId', paginate, getUserSpins);
 
 // Admin routes
-router.get('/', protect, authorize, getSpins);
+router.get('/', protect, authorize, paginate, getSpins);
 router.get('/stats', protect, authorize, getSpinStats);
 
 export default router; 

@@ -2,17 +2,30 @@ import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import User, { IUser } from '../models/User';
 import Spin from '../models/Spin';
+import { PaginatedRequest, getPaginationInfo, paginate } from '../middleware/paginate';
 
 // @desc    Lấy tất cả người dùng
 // @route   GET /api/users
 // @access  Private
 export const getUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const users = await User.find().sort({ createdAt: -1 });
+    const { page, limit, skip } = (req as PaginatedRequest).pagination;
+    
+    // Đếm tổng số người dùng
+    const totalItems = await User.countDocuments();
+    
+    // Lấy người dùng có phân trang
+    const users = await User.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    // Lấy thông tin phân trang
+    const pagination = getPaginationInfo(totalItems, page, limit);
 
     res.status(200).json({
       success: true,
-      count: users.length,
+      pagination,
       data: users
     });
   } catch (error) {
@@ -182,7 +195,16 @@ export const createOrUpdateUser = async (req: Request, res: Response): Promise<v
 // @access  Private
 export const exportUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const users = await User.find().sort({ createdAt: -1 });
+    const { page, limit, skip } = (req as PaginatedRequest).pagination;
+    
+    // Đếm tổng số người dùng
+    const totalItems = await User.countDocuments();
+    
+    // Lấy người dùng có phân trang
+    const users = await User.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
     
     // Chuyển đổi dữ liệu để dễ export
     const formattedUsers = users.map(user => ({
@@ -197,8 +219,12 @@ export const exportUsers = async (req: Request, res: Response): Promise<void> =>
       createdAt: user.createdAt
     }));
 
+    // Lấy thông tin phân trang
+    const pagination = getPaginationInfo(totalItems, page, limit);
+
     res.status(200).json({
       success: true,
+      pagination,
       data: formattedUsers
     });
   } catch (error) {

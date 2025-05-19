@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import connectDB from './config/db';
 
 // Load các routes
@@ -18,9 +19,18 @@ connectDB();
 // Khởi tạo express app
 const app = express();
 
+// Thiết lập CORS để cho phép credentials (cookies)
+app.use(cors({
+  origin: function(origin, callback) {
+    // Cho phép tất cả nguồn gốc (origins)
+    callback(null, true);
+  },
+  credentials: true
+}));
+
 // Middleware
-app.use(cors());
 app.use(express.json());
+app.use(cookieParser(process.env.JWT_SECRET)); // Sử dụng cookie-parser với JWT_SECRET làm cookie secret
 
 // Định nghĩa routes
 app.use('/api/auth', authRoutes);

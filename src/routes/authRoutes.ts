@@ -1,6 +1,6 @@
 import express from 'express';
 import { body } from 'express-validator';
-import { login, getMe, register } from '../controllers/authController';
+import { login, getMe, register, refreshTokenHandler, logout } from '../controllers/authController';
 import { protect, authorize } from '../middleware/auth';
 
 const router = express.Router();
@@ -22,5 +22,9 @@ const registerValidation = [
 router.post('/login', loginValidation, login);
 router.get('/me', protect, getMe);
 router.post('/register', registerValidation, protect, authorize, register);
+
+// Routes cho refresh token và logout
+router.post('/refresh-token', refreshTokenHandler);
+router.post('/logout', logout);
 
 export default router; 

@@ -4,6 +4,7 @@ import User from '../models/User';
 import Prize from '../models/Prize';
 import Spin from '../models/Spin';
 import { checkAndSendWinningEmail } from '../utils/emailService';
+import { PaginatedRequest, getPaginationInfo, paginate } from '../middleware/paginate';
 
 // @desc    Quay thưởng
 // @route   POST /api/spins
@@ -154,6 +155,8 @@ export const spin = async (req: Request, res: Response): Promise<void> => {
 // @access  Private
 export const getSpins = async (req: Request, res: Response): Promise<void> => {
   try {
+    const { page, limit, skip } = (req as PaginatedRequest).pagination;
+    
     // Filter theo ngày nếu có
     let filter = {};
     
@@ -170,14 +173,26 @@ export const getSpins = async (req: Request, res: Response): Promise<void> => {
       };
     }
     
+    // Đếm tổng số lịch sử quay theo filter
+    const totalItems = await Spin.countDocuments(filter);
+    
+    // Lấy lịch sử quay có phân trang
     const spins = await Spin.find(filter)
-      .populate('user')
+      .populate({
+        path: 'user',
+        select: 'name email phone address codeShop' // Thêm phone và address vào select
+      })
       .populate('prize')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    // Lấy thông tin phân trang
+    const pagination = getPaginationInfo(totalItems, page, limit);
 
     res.status(200).json({
       success: true,
-      count: spins.length,
+      pagination,
       data: spins
     });
   } catch (error) {
@@ -197,12 +212,19 @@ export const getSpins = async (req: Request, res: Response): Promise<void> => {
 export const getUserSpins = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.params.userId;
+    const { page, limit, skip } = (req as PaginatedRequest).pagination;
     
+    // Đếm tổng số lịch sử quay của user
+    const totalItems = await Spin.countDocuments({ user: userId });
+    
+    // Lấy lịch sử quay có phân trang
     const spins = await Spin.find({ user: userId })
       .populate('prize')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId, 'name email phone address codeShop spinsToday lastSpinDate');
     
     if (!user) {
       res.status(404).json({
@@ -225,11 +247,15 @@ export const getUserSpins = async (req: Request, res: Response): Promise<void> =
       remainingSpins = 5 - user.spinsToday;
     }
 
+    // Lấy thông tin phân trang
+    const pagination = getPaginationInfo(totalItems, page, limit);
+
     res.status(200).json({
       success: true,
-      count: spins.length,
+      pagination,
       data: {
         spins,
+        user,
         remainingSpins
       }
     });

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import Prize, { IPrize } from '../models/Prize';
+import { PaginatedRequest, getPaginationInfo, paginate } from '../middleware/paginate';
 
 // @desc    Lấy tất cả phần thưởng
 // @route   GET /api/prizes
@@ -28,11 +29,23 @@ export const getPrizes = async (req: Request, res: Response): Promise<void> => {
 // @access  Private
 export const getAllPrizes = async (req: Request, res: Response): Promise<void> => {
   try {
-    const prizes = await Prize.find();
+    const { page, limit, skip } = (req as PaginatedRequest).pagination;
+    
+    // Đếm tổng số phần thưởng
+    const totalItems = await Prize.countDocuments();
+    
+    // Lấy phần thưởng có phân trang
+    const prizes = await Prize.find()
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    // Lấy thông tin phân trang
+    const pagination = getPaginationInfo(totalItems, page, limit);
 
     res.status(200).json({
       success: true,
-      count: prizes.length,
+      pagination,
       data: prizes
     });
   } catch (error) {

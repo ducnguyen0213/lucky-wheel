@@ -8,6 +8,7 @@ import {
   exportUsers
 } from '../controllers/userController';
 import { protect, authorize } from '../middleware/auth';
+import { paginate } from '../middleware/paginate';
 
 const router = express.Router();
 
@@ -34,8 +35,8 @@ router.post('/check', checkUserValidation, checkUser);
 router.post('/', userValidation, createOrUpdateUser);
 
 // Admin routes
-router.get('/', protect, authorize, getUsers);
-router.get('/export', protect, authorize, exportUsers);
+router.get('/', protect, authorize, paginate, getUsers);
+router.get('/export', protect, authorize, paginate, exportUsers);
 router.get('/:id', protect, authorize, getUser);
 
 export default router; 

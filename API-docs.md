@@ -1,5 +1,49 @@
 # Tài liệu API Lucky Wheel
 
+## Thông tin phân trang
+
+Các API có hỗ trợ phân trang đều chấp nhận các tham số truy vấn sau:
+- `page`: Số trang (bắt đầu từ 1, mặc định là 1)
+- `limit`: Số lượng kết quả trên mỗi trang (mặc định là 10, tối đa là 100)
+
+Đối tượng phân trang trong phản hồi sẽ có dạng:
+```json
+{
+  "page": 1,
+  "limit": 10,
+  "totalPages": 5,
+  "totalItems": 42,
+  "hasNextPage": true,
+  "hasPrevPage": false
+}
+```
+
+## Hệ thống xác thực và Token
+
+### Tổng quan
+Hệ thống sử dụng cơ chế xác thực dựa trên JWT (JSON Web Token) với hai loại token:
+
+1. **Access Token**: 
+   - Được trả về trong phản hồi API
+   - Sử dụng để xác thực các yêu cầu API
+   - Thời gian sống ngắn (mặc định 1 giờ)
+
+2. **Refresh Token**:
+   - Được lưu trữ trong cookie HTTP-only
+   - Dùng để tự động làm mới access token khi hết hạn
+   - Thời gian sống dài hơn (mặc định 7 ngày)
+
+### Sử dụng Access Token
+- Tất cả các API cần xác thực đều yêu cầu gửi access token trong header:
+  ```
+  Authorization: Bearer YOUR_ACCESS_TOKEN
+  ```
+
+### Refresh Token tự động
+- Khi access token hết hạn, client sẽ nhận được mã lỗi `401`
+- Client cần gọi API `/api/auth/refresh-token` để nhận access token mới
+- Cookie refresh token được tự động gửi kèm request
+
 ## Xác thực (Authentication)
 
 ### Đăng nhập Admin
@@ -24,6 +68,33 @@
     }
   }
   ```
+- **Cookie**: Hệ thống tự động thiết lập HTTP-only cookie chứa refresh token
+
+### Làm mới Access Token
+- **URL**: `/api/auth/refresh-token`
+- **Method**: `POST`
+- **Cookie**: Refresh token được tự động gửi kèm trong cookie
+- **Phản hồi**:
+  ```json
+  {
+    "success": true,
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+  ```
+
+### Đăng xuất
+- **URL**: `/api/auth/logout`
+- **Method**: `POST`
+- **Headers**: 
+  - `Authorization: Bearer YOUR_TOKEN`
+- **Phản hồi**:
+  ```json
+  {
+    "success": true,
+    "message": "Đăng xuất thành công"
+  }
+  ```
+- **Cookie**: Refresh token sẽ bị xóa
 
 ### Lấy thông tin Admin hiện tại
 - **URL**: `/api/auth/me`
@@ -124,11 +195,21 @@
 - **Method**: `GET`
 - **Headers**: 
   - `Authorization: Bearer YOUR_TOKEN`
+- **Query**: 
+  - `page`: Số trang (mặc định: 1)
+  - `limit`: Số lượng phần tử mỗi trang (mặc định: 10)
 - **Phản hồi**:
   ```json
   {
     "success": true,
-    "count": 5,
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "totalPages": 1,
+      "totalItems": 5,
+      "hasNextPage": false,
+      "hasPrevPage": false
+    },
     "data": [
       // Tất cả phần thưởng bao gồm cả những phần không active
     ]
@@ -280,11 +361,21 @@
 - **Method**: `GET`
 - **Headers**: 
   - `Authorization: Bearer YOUR_TOKEN`
+- **Query**: 
+  - `page`: Số trang (mặc định: 1)
+  - `limit`: Số lượng phần tử mỗi trang (mặc định: 10)
 - **Phản hồi**:
   ```json
   {
     "success": true,
-    "count": 50,
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "totalPages": 5,
+      "totalItems": 50,
+      "hasNextPage": true,
+      "hasPrevPage": false
+    },
     "data": [
       {
         "_id": "60d21b4667d0d8992e610c89",
@@ -333,16 +424,29 @@
 - **Method**: `GET`
 - **Headers**: 
   - `Authorization: Bearer YOUR_TOKEN`
+- **Query**: 
+  - `page`: Số trang (mặc định: 1)
+  - `limit`: Số lượng phần tử mỗi trang (mặc định: 10)
 - **Phản hồi**:
   ```json
   {
     "success": true,
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "totalPages": 5,
+      "totalItems": 50,
+      "hasNextPage": true,
+      "hasPrevPage": false
+    },
     "data": [
       {
         "id": "60d21b4667d0d8992e610c89",
         "name": "Nguyễn Văn A",
         "email": "user@example.com",
         "phone": "0987654321",
+        "address": "123 Đường ABC, Quận XYZ",
+        "codeShop": "SHOP123",
         "spinsToday": 2,
         "lastSpinDate": "2023-05-17T12:30:00.000Z",
         "createdAt": "2023-05-17T12:10:00.000Z"
@@ -391,11 +495,21 @@
 - **Method**: `GET`
 - **Params**: 
   - `userId`: ID của người dùng
+- **Query**: 
+  - `page`: Số trang (mặc định: 1)
+  - `limit`: Số lượng phần tử mỗi trang (mặc định: 10)
 - **Phản hồi**:
   ```json
   {
     "success": true,
-    "count": 2,
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "totalPages": 1,
+      "totalItems": 5,
+      "hasNextPage": false,
+      "hasPrevPage": false
+    },
     "data": {
       "spins": [
         {
@@ -424,11 +538,20 @@
 - **Query**: 
   - `startDate` (không bắt buộc): Ngày bắt đầu (YYYY-MM-DD)
   - `endDate` (không bắt buộc): Ngày kết thúc (YYYY-MM-DD)
+  - `page`: Số trang (mặc định: 1)
+  - `limit`: Số lượng phần tử mỗi trang (mặc định: 10)
 - **Phản hồi**:
   ```json
   {
     "success": true,
-    "count": 100,
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "totalPages": 10,
+      "totalItems": 100,
+      "hasNextPage": true,
+      "hasPrevPage": false
+    },
     "data": [
       {
         "_id": "60d21b4667d0d8992e610c8a",

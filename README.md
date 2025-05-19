@@ -25,16 +25,6 @@ cd lucky-wheel
 npm install
 ```
 
-3. Tạo file .env trong thư mục gốc với nội dung:
-```
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/lucky-wheel
-JWT_SECRET=your_super_secret_key_change_in_production
-JWT_EXPIRE=30d
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=admin123
-```
-
 4. Khởi tạo tài khoản admin mặc định
 ```bash
 npm run seed
