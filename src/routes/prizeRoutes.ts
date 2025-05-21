@@ -17,7 +17,8 @@ const router = express.Router();
 const prizeValidation = [
   body('name', 'Vui lòng nhập tên phần thưởng').notEmpty(),
   body('probability', 'Tỉ lệ trúng thưởng phải từ 0-100').isFloat({ min: 0, max: 100 }),
-  body('originalQuantity', 'Số lượng phải là số nguyên dương').isInt({ min: 0 })
+  body('originalQuantity', 'Số lượng phải là số nguyên dương').isInt({ min: 0 }),
+  body('isRealPrize').optional().isBoolean().withMessage('isRealPrize phải là giá trị boolean')
 ];
 
 // Admin routes - đặt trước routes có params

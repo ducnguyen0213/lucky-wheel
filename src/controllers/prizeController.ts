@@ -97,7 +97,7 @@ export const createPrize = async (req: Request, res: Response): Promise<void> =>
 
   try {
     // Tạo phần thưởng mới
-    const { name, description, imageUrl, probability, originalQuantity } = req.body;
+    const { name, description, imageUrl, probability, originalQuantity, isRealPrize } = req.body;
     
     const prize = await Prize.create({
       name,
@@ -105,7 +105,8 @@ export const createPrize = async (req: Request, res: Response): Promise<void> =>
       imageUrl,
       probability,
       originalQuantity,
-      remainingQuantity: originalQuantity
+      remainingQuantity: originalQuantity,
+      isRealPrize: isRealPrize !== undefined ? isRealPrize : true
     });
 
     res.status(201).json({

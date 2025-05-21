@@ -9,6 +9,7 @@ export interface IPrize extends Document {
   remainingQuantity: number;
   originalQuantity: number;
   active: boolean;
+  isRealPrize: boolean; // Xác định có phải là phần thưởng thật hay không (như "chúc bạn may mắn lần sau")
   createdAt: Date;
 }
 
@@ -50,6 +51,11 @@ const PrizeSchema: Schema = new Schema({
   active: {
     type: Boolean,
     default: true
+  },
+  isRealPrize: {
+    type: Boolean,
+    default: true, // Mặc định là phần thưởng thật
+    required: [true, 'Vui lòng xác định đây có phải phần thưởng thật hay không']
   },
   createdAt: {
     type: Date,

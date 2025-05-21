@@ -96,13 +96,13 @@ export const spin = async (req: Request, res: Response): Promise<void> => {
         cumulativeProbability += item.probability;
         if (randomValue <= cumulativeProbability) {
           selectedPrize = item.prize;
-          isWin = !!selectedPrize;
+          isWin = !!selectedPrize && selectedPrize.isRealPrize;
           break;
         }
       }
       
       // Nếu trúng thưởng, giảm số lượng phần thưởng còn lại
-      if (isWin && selectedPrize) {
+      if (selectedPrize) {
         selectedPrize.remainingQuantity -= 1;
         await selectedPrize.save();
       }
@@ -123,7 +123,7 @@ export const spin = async (req: Request, res: Response): Promise<void> => {
     // Populate prize details
     const spinWithPrize = await Spin.findById(spin._id).populate('prize');
     
-    // Kiểm tra và gửi email nếu đủ điều kiện
+    // Kiểm tra và gửi email nếu đã quay đủ 5 lần
     if (user.spinsToday >= 5 && user.email) {
       // Gửi email bất đồng bộ để không ảnh hưởng đến response
       checkAndSendWinningEmail(user).catch((err: Error) => {

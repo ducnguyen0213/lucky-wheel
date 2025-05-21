@@ -180,18 +180,17 @@ export const checkAndSendWinningEmail = async (user: IUser): Promise<void> => {
         }
       }).populate<{ prize: IPrize | null }>('prize');
 
-      // Nếu có giải thưởng, gửi email
-      if (spins.length > 0) {
-        const prizes = spins
-          .filter(spin => spin.prize !== null)
-          .map(spin => ({
-            name: spin.prize?.name || 'Giải thưởng',
-            description: spin.prize?.description
-          }));
+      // Lọc ra các phần thưởng thật (có isRealPrize = true)
+      const realPrizes = spins
+        .filter(spin => spin.prize !== null && spin.prize.isRealPrize === true)
+        .map(spin => ({
+          name: spin.prize?.name || 'Giải thưởng',
+          description: spin.prize?.description
+        }));
 
-        if (prizes.length > 0) {
-          await sendWinningEmail(user, prizes);
-        }
+      // Chỉ gửi email nếu có phần thưởng thật
+      if (realPrizes.length > 0) {
+        await sendWinningEmail(user, realPrizes);
       }
     }
   } catch (error) {
