@@ -6,6 +6,7 @@ export interface IPrize extends Document {
   description?: string;
   imageUrl?: string;
   probability: number; // tỉ lệ trúng, từ 0-100
+  tier: number; // Bậc giải thưởng (ví dụ: 1, 2, 3)
   remainingQuantity: number;
   originalQuantity: number;
   active: boolean;
@@ -31,6 +32,11 @@ const PrizeSchema: Schema = new Schema({
       /^(http|https):\/\/[^ "]+$/,
       'URL hình ảnh không hợp lệ'
     ]
+  },
+  tier: {
+    type: Number,
+    required: [true, 'Vui lòng nhập Bậc của giải thưởng'],
+    index: true // Thêm index để tối ưu truy vấn theo Bậc
   },
   probability: {
     type: Number,

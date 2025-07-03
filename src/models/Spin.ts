@@ -2,7 +2,8 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 // Định nghĩa interface cho document Spin
 export interface ISpin extends Document {
-  user: mongoose.Types.ObjectId;
+  user?: mongoose.Types.ObjectId;
+  employee?: mongoose.Types.ObjectId;
   prize: mongoose.Types.ObjectId | null;
   isWin: boolean;
   createdAt: Date;
@@ -13,7 +14,12 @@ const SpinSchema: Schema = new Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false
+  },
+  employee: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee',
+    required: false
   },
   prize: {
     type: mongoose.Schema.Types.ObjectId,
@@ -32,6 +38,7 @@ const SpinSchema: Schema = new Schema({
 
 // Indexes
 SpinSchema.index({ user: 1, createdAt: -1 });
+SpinSchema.index({ employee: 1, createdAt: -1 });
 SpinSchema.index({ createdAt: -1 });
 
 // Tạo và export Spin model

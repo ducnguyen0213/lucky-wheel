@@ -9,12 +9,17 @@ import authRoutes from './routes/authRoutes';
 import prizeRoutes from './routes/prizeRoutes';
 import userRoutes from './routes/userRoutes';
 import spinRoutes from './routes/spinRoutes';
+import employeeRoutes from './routes/employeeRoutes';
+import scheduleEndOfDayEmailJob from './jobs/dailyEmailJob';
 
 // Load env vars
 dotenv.config();
 
 // Kết nối Database
 connectDB();
+
+// Lên lịch cho cron job
+scheduleEndOfDayEmailJob();
 
 // Khởi tạo express app
 const app = express();
@@ -59,6 +64,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/prizes', prizeRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/spins', spinRoutes);
+app.use('/api/employees', employeeRoutes);
 
 // Route mặc định
 app.get('/', (req: Request, res: Response) => {

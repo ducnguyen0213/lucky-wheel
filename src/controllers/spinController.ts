@@ -3,13 +3,14 @@ import { validationResult } from 'express-validator';
 import User from '../models/User';
 import Prize from '../models/Prize';
 import Spin from '../models/Spin';
-import { checkAndSendWinningEmail } from '../utils/emailService';
+import { checkAndSendWinningEmail, checkAndSendWinningEmailForEmployee } from '../utils/emailService';
 import { PaginatedRequest, getPaginationInfo, paginate } from '../middleware/paginate';
+import Employee from '../models/Employee';
 
 // @desc    Quay thưởng
 // @route   POST /api/spins
 // @access  Public
-export const spin = async (req: Request, res: Response): Promise<void> => {
+const spin = async (req: Request, res: Response): Promise<void> => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     res.status(400).json({ errors: errors.array() });
@@ -150,10 +151,123 @@ export const spin = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+// @desc    Nhân viên quay thưởng
+// @route   POST /api/spins/employee
+// @access  Public
+const spinForEmployee = async (req: Request, res: Response): Promise<void> => {
+    const { employeeCode } = req.body;
+
+    if (!employeeCode) {
+        res.status(400).json({ success: false, message: 'Vui lòng cung cấp mã nhân viên' });
+        return;
+    }
+
+    try {
+        // 1. Tìm nhân viên
+        const employee = await Employee.findOne({ employeeCode });
+        if (!employee) {
+            res.status(404).json({ success: false, message: 'Mã nhân viên không hợp lệ' });
+            return;
+        }
+
+        // 2. Kiểm tra lượt quay
+        const totalSpins = calculateTotalSpins(employee.machinesSold);
+        if (employee.spinsUsed >= totalSpins) {
+            res.status(400).json({ success: false, message: 'Bạn đã hết lượt quay' });
+            return;
+        }
+
+        // 3. Xác định Bậc giải thưởng từ chuỗi
+        const prizeTier = employee.spinTierSequence[employee.spinsUsed];
+        if (!prizeTier) {
+            res.status(500).json({ success: false, message: 'Lỗi hệ thống: Không thể xác định bậc giải thưởng.' });
+            return;
+        }
+
+        // 4. Lấy giải thưởng trong Bậc đó
+        const prizesInTier = await Prize.find({ tier: prizeTier, active: true, remainingQuantity: { $gt: 0 } });
+        if (prizesInTier.length === 0) {
+            res.status(404).json({ success: false, message: `Hiện không có giải thưởng nào cho Bậc ${prizeTier}. Vui lòng thử lại sau.` });
+            return;
+        }
+
+        // 5. Quay ngẫu nhiên trong Bậc
+        const prizePool = prizesInTier.map(p => ({ prize: p, probability: p.probability }));
+        const totalProbability = prizePool.reduce((sum, p) => sum + p.probability, 0);
+        
+        const randomValue = Math.random() * totalProbability;
+        let cumulativeProbability = 0;
+        let selectedPrize = null;
+
+        for (const item of prizePool) {
+            cumulativeProbability += item.probability;
+            if (randomValue <= cumulativeProbability) {
+                selectedPrize = item.prize;
+                break;
+            }
+        }
+        
+        // Mặc định chọn giải đầu tiên nếu có lỗi
+        if (!selectedPrize && prizesInTier.length > 0) {
+            selectedPrize = prizesInTier[0];
+        }
+
+        // 6. Cập nhật và lưu
+        if (selectedPrize) {
+            selectedPrize.remainingQuantity -= 1;
+            await selectedPrize.save();
+        }
+        
+        employee.spinsUsed += 1;
+        const updatedEmployee = await employee.save();
+
+        // 7. Lưu lịch sử
+        const spin = await Spin.create({
+            employee: employee._id,
+            prize: selectedPrize ? selectedPrize._id : null,
+            isWin: !!selectedPrize
+        });
+        
+        const spinWithPrize = await Spin.findById(spin._id).populate('prize');
+
+        // 8. Kiểm tra và gửi email nếu hết lượt
+        if (updatedEmployee.spinsUsed >= totalSpins) {
+            // Gửi email bất đồng bộ
+            checkAndSendWinningEmailForEmployee(updatedEmployee).catch(err => {
+                console.error('Lỗi nền khi gửi email cho nhân viên:', err);
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                spin: spinWithPrize,
+                isWin: !!selectedPrize,
+                remainingSpins: totalSpins - employee.spinsUsed
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: error instanceof Error ? error.message : 'Lỗi không xác định',
+        });
+    }
+};
+
+const calculateTotalSpins = (machinesSold: number): number => {
+    if (machinesSold >= 10) return 6;
+    if (machinesSold >= 5) return 3;
+    if (machinesSold >= 1) return 1;
+    return 0;
+};
+
 // @desc    Lấy lịch sử quay
 // @route   GET /api/spins
 // @access  Private
-export const getSpins = async (req: Request, res: Response): Promise<void> => {
+const getSpins = async (req: Request, res: Response): Promise<void> => {
   try {
     const { page, limit, skip } = (req as PaginatedRequest).pagination;
     
@@ -180,7 +294,11 @@ export const getSpins = async (req: Request, res: Response): Promise<void> => {
     const spins = await Spin.find(filter)
       .populate({
         path: 'user',
-        select: 'name email phone address codeShop' // Thêm phone và address vào select
+        select: 'name email phone address codeShop'
+      })
+      .populate({
+        path: 'employee',
+        select: 'name email phone codeShop'
       })
       .populate('prize')
       .sort({ createdAt: -1 })
@@ -209,7 +327,7 @@ export const getSpins = async (req: Request, res: Response): Promise<void> => {
 // @desc    Lấy lịch sử quay của một người dùng
 // @route   GET /api/spins/user/:userId
 // @access  Public/Private
-export const getUserSpins = async (req: Request, res: Response): Promise<void> => {
+const getUserSpins = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.params.userId;
     const { page, limit, skip } = (req as PaginatedRequest).pagination;
@@ -219,6 +337,10 @@ export const getUserSpins = async (req: Request, res: Response): Promise<void> =
     
     // Lấy lịch sử quay có phân trang
     const spins = await Spin.find({ user: userId })
+      .populate({
+        path: 'user',
+        select: 'name email'
+      })
       .populate('prize')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -273,7 +395,7 @@ export const getUserSpins = async (req: Request, res: Response): Promise<void> =
 // @desc    Thống kê
 // @route   GET /api/spins/stats
 // @access  Private
-export const getSpinStats = async (req: Request, res: Response): Promise<void> => {
+const getSpinStats = async (req: Request, res: Response): Promise<void> => {
   try {
     // Filter theo ngày nếu có
     let dateFilter = {};
@@ -345,4 +467,13 @@ export const getSpinStats = async (req: Request, res: Response): Promise<void> =
       stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : '') : undefined
     });
   }
+};
+
+export {
+    spin,
+    getSpins,
+    getUserSpins,
+    getSpinStats,
+    spinForEmployee,
+    calculateTotalSpins,
 }; 

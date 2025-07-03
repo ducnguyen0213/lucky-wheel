@@ -4,7 +4,8 @@ import {
   spin,
   getSpins,
   getUserSpins,
-  getSpinStats
+  getSpinStats,
+  spinForEmployee
 } from '../controllers/spinController';
 import { protect, authorize } from '../middleware/auth';
 import { paginate } from '../middleware/paginate';
@@ -16,8 +17,13 @@ const spinValidation = [
   body('userId', 'User ID không hợp lệ').isMongoId()
 ];
 
+const employeeSpinValidation = [
+  body('employeeCode', 'Mã nhân viên không được để trống').not().isEmpty()
+];
+
 // Public routes
 router.post('/', spinValidation, spin);
+router.post('/employee', employeeSpinValidation, spinForEmployee);
 router.get('/user/:userId', paginate, getUserSpins);
 
 // Admin routes
