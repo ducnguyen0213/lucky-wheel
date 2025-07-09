@@ -11,6 +11,7 @@ export interface IEmployee extends Document {
   machinesSold: number; // 2 or 5
   spinsUsed: number;
   spinTierSequence: number[];
+  totalSpins?: number; // Thêm trường totalSpins tùy chỉnh
 }
 
 const employeeSchema = new Schema<IEmployee>(
@@ -59,6 +60,10 @@ const employeeSchema = new Schema<IEmployee>(
     spinTierSequence: {
         type: [Number],
         default: []
+    },
+    totalSpins: {
+        type: Number,
+        min: [0, 'Số lượt quay không được âm']
     }
   },
   {

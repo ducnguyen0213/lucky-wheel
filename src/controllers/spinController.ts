@@ -7,6 +7,56 @@ import { checkAndSendWinningEmail, checkAndSendWinningEmailForEmployee } from '.
 import { PaginatedRequest, getPaginationInfo, paginate } from '../middleware/paginate';
 import Employee from '../models/Employee';
 
+// --- Helper Functions ---
+const shuffleArray = (array: any[]) => {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+};
+
+const generateSpinSequence = (totalSpins: number): number[] => {
+    if (totalSpins === 1) return [1];
+    if (totalSpins === 3) return [1, 2, 2]; // Fixed sequence for 3 spins
+    if (totalSpins === 6) {
+        const baseSequence = [1, 1, 1, 1, 2, 3];
+        return shuffleArray(baseSequence);
+    }
+    
+    // Xử lý các trường hợp số lượt quay khác
+    if (totalSpins > 0) {
+        // Tạo một chuỗi tùy chỉnh dựa trên số lượt quay
+        const customSequence = [];
+        
+        // Phân bổ giải thưởng theo tỉ lệ:
+        // - 10% giải bậc 3 (tối thiểu 1 nếu totalSpins >= 4)
+        // - 20% giải bậc 2
+        // - 70% giải bậc 1
+        
+        let tier3Count = Math.max(Math.floor(totalSpins * 0.1), totalSpins >= 4 ? 1 : 0);
+        let tier2Count = Math.floor(totalSpins * 0.2);
+        let tier1Count = totalSpins - tier3Count - tier2Count;
+        
+        // Đảm bảo có ít nhất 1 giải bậc 1
+        if (tier1Count < 1 && totalSpins > 0) {
+            tier1Count = 1;
+            if (tier2Count > 0) tier2Count--;
+            else if (tier3Count > 0) tier3Count--;
+        }
+        
+        // Thêm các giải vào chuỗi
+        for (let i = 0; i < tier1Count; i++) customSequence.push(1);
+        for (let i = 0; i < tier2Count; i++) customSequence.push(2);
+        for (let i = 0; i < tier3Count; i++) customSequence.push(3);
+        
+        // Xáo trộn chuỗi
+        return shuffleArray(customSequence);
+    }
+    
+    return [];
+};
+
 // @desc    Quay thưởng
 // @route   POST /api/spins
 // @access  Public
@@ -171,13 +221,30 @@ const spinForEmployee = async (req: Request, res: Response): Promise<void> => {
         }
 
         // 2. Kiểm tra lượt quay
-        const totalSpins = calculateTotalSpins(employee.machinesSold);
+        // Ưu tiên sử dụng totalSpins tùy chỉnh nếu có
+        const totalSpins = employee.totalSpins !== undefined 
+            ? employee.totalSpins 
+            : calculateTotalSpins(employee.machinesSold);
+            
         if (employee.spinsUsed >= totalSpins) {
             res.status(400).json({ success: false, message: 'Bạn đã hết lượt quay' });
             return;
         }
 
         // 3. Xác định Bậc giải thưởng từ chuỗi
+        // Kiểm tra xem spinTierSequence có tồn tại và có phần tử không
+        if (!employee.spinTierSequence || employee.spinTierSequence.length === 0) {
+            // Tạo lại chuỗi bậc giải thưởng nếu không có
+            employee.spinTierSequence = generateSpinSequence(totalSpins);
+            await employee.save();
+            
+            // Nếu vẫn không tạo được chuỗi
+            if (!employee.spinTierSequence || employee.spinTierSequence.length === 0) {
+                res.status(500).json({ success: false, message: 'Lỗi hệ thống: Không thể tạo chuỗi bậc giải thưởng.' });
+                return;
+            }
+        }
+        
         const prizeTier = employee.spinTierSequence[employee.spinsUsed];
         if (!prizeTier) {
             res.status(500).json({ success: false, message: 'Lỗi hệ thống: Không thể xác định bậc giải thưởng.' });
@@ -476,4 +543,6 @@ export {
     getSpinStats,
     spinForEmployee,
     calculateTotalSpins,
+    generateSpinSequence,
+    shuffleArray,
 }; 

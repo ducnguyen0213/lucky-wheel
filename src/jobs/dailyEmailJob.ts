@@ -48,7 +48,10 @@ const scheduleEndOfDayEmailJob = () => {
           continue;
         }
 
-        const totalSpins = calculateTotalSpins(employee.machinesSold);
+        // Ưu tiên sử dụng totalSpins tùy chỉnh nếu có
+        const totalSpins = employee.totalSpins !== undefined 
+            ? employee.totalSpins 
+            : calculateTotalSpins(employee.machinesSold);
         
         // 3. Chỉ gửi mail nếu họ đã quay nhưng CHƯA hết lượt
         if (employee.spinsUsed > 0 && employee.spinsUsed < totalSpins) {
