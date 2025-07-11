@@ -306,6 +306,7 @@ const importEmployees = asyncHandler(async (req: Request, res: Response) => {
     };
 
     for (const row of data) {
+      const rowIdentifier = `(Mã NV: ${row["Mã nhân viên"] || 'N/A'}, Email: ${row["Email"] || 'N/A'})`;
       try {
         // Chuẩn hóa và làm sạch dữ liệu từ Excel
         const employeeCode = row["Mã nhân viên"] ? String(row["Mã nhân viên"]).trim() : undefined;
@@ -319,7 +320,7 @@ const importEmployees = asyncHandler(async (req: Request, res: Response) => {
 
         if (!employeeCode || !name || !email) {
           results.failed++;
-          results.errors.push(`Dòng thiếu thông tin bắt buộc: ${JSON.stringify(row)}`);
+          results.errors.push(`Dòng ${rowIdentifier} thiếu thông tin bắt buộc (Mã nhân viên, Họ tên, Email).`);
           continue;
         }
 
@@ -329,56 +330,54 @@ const importEmployees = asyncHandler(async (req: Request, res: Response) => {
         });
 
         if (employee) {
-          // Cập nhật nhân viên hiện có
+          // --- LOGIC CẬP NHẬT ---
+          // Chỉ cập nhật các trường có giá trị được cung cấp từ file Excel
+          // Các trường bắt buộc như name và email sẽ luôn được cập nhật
+          employee.name = name;
+          employee.email = email;
+          employee.machinesSold = machinesSold; // Luôn cập nhật số máy bán
+
+          // Các trường tùy chọn chỉ cập nhật nếu có giá trị
+          if (phone) employee.phone = phone;
+          if (codeShop) employee.codeShop = codeShop;
+          if (address) employee.address = address;
+          
           // Lấy giá trị totalSpins hiện tại
           const oldTotalSpins = employee.totalSpins !== undefined 
               ? employee.totalSpins 
               : calculateTotalSpins(employee.machinesSold);
            
-          // Cập nhật thông tin
-          employee.name = name;
-          employee.phone = phone;
-          employee.codeShop = codeShop;
-          employee.address = address;
-          employee.machinesSold = machinesSold;
-          
           // Xử lý số lượt quay tùy chỉnh nếu có
           if (customTotalSpins !== undefined) {
-            // Lưu totalSpins tùy chỉnh
-            employee.totalSpins = customTotalSpins;
-            
-            // Nếu số lượt quay mới lớn hơn số lượt quay cũ
-            if (customTotalSpins > oldTotalSpins) {
-              // Reset spinsUsed và tạo lại chuỗi bậc giải thưởng
-              employee.spinsUsed = 0;
-              employee.spinTierSequence = generateSpinSequence(customTotalSpins);
-            }
-            // Nếu số lượt quay mới nhỏ hơn số lượt quay cũ nhưng lớn hơn số lượt đã sử dụng
-            else if (customTotalSpins > employee.spinsUsed) {
-              // Chỉ tạo lại chuỗi bậc giải thưởng, không reset spinsUsed
-              employee.spinTierSequence = generateSpinSequence(customTotalSpins);
-            }
-            // Nếu số lượt quay mới nhỏ hơn hoặc bằng số lượt đã sử dụng
-            else if (customTotalSpins <= employee.spinsUsed) {
-              // Giới hạn spinsUsed không vượt quá totalSpins
-              employee.spinsUsed = customTotalSpins;
-              // Xóa chuỗi bậc giải thưởng cũ vì đã hết lượt
-              employee.spinTierSequence = [];
+            // Nếu số lượt quay tùy chỉnh khác với số lượt quay được tính toán hiện tại
+            if (customTotalSpins !== oldTotalSpins) {
+                employee.totalSpins = customTotalSpins;
+                // Reset và tạo lại chuỗi nếu gói quay được nâng cấp
+                if (customTotalSpins > oldTotalSpins) {
+                    employee.spinsUsed = 0;
+                    employee.spinTierSequence = generateSpinSequence(customTotalSpins);
+                } else if (customTotalSpins > employee.spinsUsed) {
+                    employee.spinTierSequence = generateSpinSequence(customTotalSpins);
+                } else {
+                    employee.spinsUsed = customTotalSpins;
+                    employee.spinTierSequence = [];
+                }
             }
           } else {
-            // Nếu không có totalSpins tùy chỉnh, tính dựa trên machinesSold
+            // Nếu không có totalSpins tùy chỉnh, tính toán lại dựa trên machinesSold
             const newTotalSpins = calculateTotalSpins(machinesSold);
-            
-            // Nếu số lượt quay mới lớn hơn số lượt quay cũ
             if (newTotalSpins > oldTotalSpins) {
               employee.spinsUsed = 0;
               employee.spinTierSequence = generateSpinSequence(newTotalSpins);
+              // Xóa totalSpins tùy chỉnh cũ nếu có
+              employee.totalSpins = undefined; 
             }
           }
            
           await employee.save();
           results.updated++;
         } else {
+          // --- LOGIC TẠO MỚI ---
           // Tạo nhân viên mới
           const totalSpins = calculateTotalSpins(machinesSold);
           const spinTierSequence = generateSpinSequence(totalSpins);
@@ -398,9 +397,27 @@ const importEmployees = asyncHandler(async (req: Request, res: Response) => {
           await newEmployee.save();
           results.created++;
         }
-      } catch (error) {
+      } catch (error: any) {
         results.failed++;
-        results.errors.push(`Lỗi xử lý dòng: ${JSON.stringify(row)} - ${error instanceof Error ? error.message : 'Lỗi không xác định'}`);
+        let errorMessage = `Lỗi xử lý dòng ${rowIdentifier}: `;
+
+        if (error.code === 11000) { // Lỗi trùng lặp của MongoDB
+            const field = Object.keys(error.keyValue)[0];
+            const value = error.keyValue[field];
+            if (field === 'employeeCode') {
+                errorMessage += `Mã nhân viên "${value}" đã tồn tại.`;
+            } else if (field === 'email') {
+                errorMessage += `Email "${value}" đã tồn tại.`;
+            } else {
+                errorMessage += `Giá trị bị trùng lặp cho trường ${field}.`;
+            }
+        } else if (error.name === 'ValidationError') { // Lỗi xác thực của Mongoose
+            const validationErrors = Object.values(error.errors).map((e: any) => e.message).join(', ');
+            errorMessage += `Dữ liệu không hợp lệ - ${validationErrors}`;
+        } else { // Các lỗi khác
+            errorMessage += error.message;
+        }
+        results.errors.push(errorMessage);
       }
     }
 
