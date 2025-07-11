@@ -307,15 +307,15 @@ const importEmployees = asyncHandler(async (req: Request, res: Response) => {
 
     for (const row of data) {
       try {
-        // Kiểm tra các trường bắt buộc
-        const employeeCode = row["Mã nhân viên"];
-        const name = row["Họ tên"];
-        const email = row["Email"];
+        // Chuẩn hóa và làm sạch dữ liệu từ Excel
+        const employeeCode = row["Mã nhân viên"] ? String(row["Mã nhân viên"]).trim() : undefined;
+        const name = row["Họ tên"] ? String(row["Họ tên"]).trim() : undefined;
+        const email = row["Email"] ? String(row["Email"]).trim() : undefined;
         const machinesSold = Number(row["Số máy bán được"] || 0);
         const customTotalSpins = row["Số lượt quay"] !== undefined ? Number(row["Số lượt quay"]) : undefined;
-        const phone = row["Số điện thoại"] || '';
-        const codeShop = row["Mã cửa hàng"] || '';
-        const address = row["Địa chỉ"] || '';
+        const phone = row["Số điện thoại"] ? String(row["Số điện thoại"]).trim() : '';
+        const codeShop = row["Mã cửa hàng"] ? String(row["Mã cửa hàng"]).trim() : '';
+        const address = row["Địa chỉ"] ? String(row["Địa chỉ"]).trim() : '';
 
         if (!employeeCode || !name || !email) {
           results.failed++;
