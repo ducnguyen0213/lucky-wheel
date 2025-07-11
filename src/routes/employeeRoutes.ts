@@ -5,7 +5,7 @@ import {
   getEmployee,
   updateEmployee,
   deleteEmployee,
-  deleteAllEmployees,
+  deleteManyEmployees,
   verifyEmployee,
   importEmployees,
 } from '../controllers/employeeController';
@@ -24,7 +24,7 @@ router
   .route('/')
   .post(protect, createEmployee)
   .get(protect, paginate, getEmployees)
-  .delete(protect, deleteAllEmployees);
+  .delete(protect, deleteManyEmployees);
 
 // Route import nhân viên từ Excel
 router.post('/import', protect, upload.single('file'), importEmployees);

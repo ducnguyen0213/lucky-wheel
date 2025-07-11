@@ -128,9 +128,57 @@ const createEmployee = asyncHandler(async (req: Request, res: Response) => {
 // @access  Private/Admin
 const getEmployees = asyncHandler(async (req: Request, res: Response) => {
   const { page, limit, skip } = (req as PaginatedRequest).pagination;
+  const {
+    keyword,
+    codeShop,
+    machinesSold,
+    totalSpins,
+  } = req.query;
 
-  const totalItems = await Employee.countDocuments({});
-  const employees = await Employee.find({}).skip(skip).limit(limit);
+  const filterClauses: any[] = [];
+  let sortOptions: any = { createdAt: -1 };
+
+  // Tìm kiếm chung bằng keyword trên nhiều trường với $text
+  if (keyword) {
+    filterClauses.push({
+        $text: { $search: String(keyword) }
+    });
+    // Sắp xếp theo mức độ liên quan khi có keyword
+    sortOptions = { score: { $meta: 'textScore' } };
+  }
+
+  // Các bộ lọc riêng biệt sẽ được AND với bộ lọc keyword
+  if (codeShop) filterClauses.push({ codeShop: { $regex: codeShop as string, $options: 'i' } });
+  if (machinesSold) filterClauses.push({ machinesSold: Number(machinesSold) });
+
+  // Xử lý logic tìm kiếm phức tạp cho totalSpins
+  if (totalSpins) {
+    const spins = Number(totalSpins);
+    const orSpins: any[] = [{ totalSpins: spins }];
+
+    const calculatedSpinsConditions: any = { totalSpins: { $in: [null, undefined] } };
+
+    if (spins === 1) {
+      calculatedSpinsConditions.machinesSold = { $gte: 1, $lt: 5 };
+      orSpins.push(calculatedSpinsConditions);
+    } else if (spins === 3) {
+      calculatedSpinsConditions.machinesSold = { $gte: 5, $lt: 10 };
+      orSpins.push(calculatedSpinsConditions);
+    } else if (spins === 6) {
+      calculatedSpinsConditions.machinesSold = { $gte: 10 };
+      orSpins.push(calculatedSpinsConditions);
+    } else if (spins === 0) {
+      calculatedSpinsConditions.machinesSold = { $lt: 1 };
+      orSpins.push(calculatedSpinsConditions);
+    }
+    
+    filterClauses.push({ $or: orSpins });
+  }
+
+  const filter = filterClauses.length > 0 ? { $and: filterClauses } : {};
+
+  const totalItems = await Employee.countDocuments(filter);
+  const employees = await Employee.find(filter).sort(sortOptions).skip(skip).limit(limit);
 
   const paginationInfo = getPaginationInfo(totalItems, page, limit);
   const formattedEmployees = employees.map(formatEmployeeResponse);
@@ -243,12 +291,28 @@ const deleteEmployee = asyncHandler(async (req: Request, res: Response) => {
   }
 });
 
-// @desc    Delete all employees
+// @desc    Delete multiple employees
 // @route   DELETE /api/employees
 // @access  Private/Admin
-const deleteAllEmployees = asyncHandler(async (req: Request, res: Response) => {
-  await Employee.deleteMany({});
-  res.status(200).json({ message: 'Tất cả nhân viên đã được xóa thành công' });
+const deleteManyEmployees = asyncHandler(async (req: Request, res: Response) => {
+  const { ids } = req.body;
+
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    res.status(400);
+    throw new Error('Vui lòng cung cấp một danh sách ID nhân viên để xóa.');
+  }
+
+  const result = await Employee.deleteMany({ _id: { $in: ids } });
+
+  if (result.deletedCount === 0) {
+    res.status(404);
+    throw new Error('Không tìm thấy nhân viên nào với các ID đã cung cấp.');
+  }
+
+  res.status(200).json({
+    success: true,
+    message: `Đã xóa thành công ${result.deletedCount} nhân viên.`,
+  });
 });
 
 // @desc    Verify employee by code
@@ -306,11 +370,11 @@ const importEmployees = asyncHandler(async (req: Request, res: Response) => {
     };
 
     for (const row of data) {
-      const rowIdentifier = `(Mã NV: ${row["Mã nhân viên"] || 'N/A'}, Email: ${row["Email"] || 'N/A'})`;
+      const rowIdentifier = `(Mã NV: ${row["Mã nhân viên"] || row["Mã số"] || 'N/A'}, Email: ${row["Email"] || 'N/A'})`;
       try {
         // Chuẩn hóa và làm sạch dữ liệu từ Excel
-        const employeeCode = row["Mã nhân viên"] ? String(row["Mã nhân viên"]).trim() : undefined;
-        const name = row["Họ tên"] ? String(row["Họ tên"]).trim() : undefined;
+        const employeeCode = (row["Mã nhân viên"] || row["Mã số"]) ? String(row["Mã nhân viên"] || row["Mã số"]).trim() : undefined;
+        const name = (row["Họ tên"] || row["Họ Tên"]) ? String(row["Họ tên"] || row["Họ Tên"]).trim() : undefined;
         const email = row["Email"] ? String(row["Email"]).trim() : undefined;
         const machinesSold = Number(row["Số máy bán được"] || 0);
         const customTotalSpins = row["Số lượt quay"] !== undefined ? Number(row["Số lượt quay"]) : undefined;
@@ -427,9 +491,15 @@ const importEmployees = asyncHandler(async (req: Request, res: Response) => {
       results
     });
   } catch (error) {
-    console.error('Lỗi khi import nhân viên:', error);
-    res.status(500);
-    throw new Error(error instanceof Error ? error.message : 'Lỗi server khi import nhân viên');
+    console.error('Lỗi nghiêm trọng khi import nhân viên:', error);
+    const message = error instanceof Error ? error.message : 'Lỗi server không xác định khi import nhân viên.';
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Đã xảy ra lỗi nghiêm trọng trong quá trình import.',
+        error: message
+      });
+    }
   }
 });
 
@@ -439,7 +509,7 @@ export {
   getEmployee,
   updateEmployee,
   deleteEmployee,
-  deleteAllEmployees,
+  deleteManyEmployees,
   verifyEmployee,
   importEmployees,
 }; 

@@ -72,6 +72,27 @@ const employeeSchema = new Schema<IEmployee>(
   }
 );
 
+// Thêm text index để hỗ trợ tìm kiếm toàn văn không phân biệt dấu
+employeeSchema.index(
+  {
+    name: 'text',
+    employeeCode: 'text',
+    email: 'text',
+    phone: 'text',
+  },
+  {
+    name: 'employee_text_search_index',
+    default_language: 'none', // Tắt tính năng language-specific để hoạt động tốt với tiếng Việt
+    weights: {
+      name: 10,
+      employeeCode: 5,
+      email: 2,
+      phone: 2,
+    },
+  }
+);
+
+
 const Employee = mongoose.model<IEmployee>('Employee', employeeSchema);
 
 export default Employee; 
