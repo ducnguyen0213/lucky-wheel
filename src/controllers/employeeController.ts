@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Employee from '../models/Employee';
 import asyncHandler from 'express-async-handler';
 import xlsx from 'xlsx';
+import { PaginatedRequest, getPaginationInfo } from '../middleware/paginate';
 
 // --- Helper Functions ---
 
@@ -126,8 +127,19 @@ const createEmployee = asyncHandler(async (req: Request, res: Response) => {
 // @route   GET /api/employees
 // @access  Private/Admin
 const getEmployees = asyncHandler(async (req: Request, res: Response) => {
-  const employees = await Employee.find({});
-  res.json(employees.map(formatEmployeeResponse));
+  const { page, limit, skip } = (req as PaginatedRequest).pagination;
+
+  const totalItems = await Employee.countDocuments({});
+  const employees = await Employee.find({}).skip(skip).limit(limit);
+
+  const paginationInfo = getPaginationInfo(totalItems, page, limit);
+  const formattedEmployees = employees.map(formatEmployeeResponse);
+
+  res.status(200).json({
+    success: true,
+    pagination: paginationInfo,
+    data: formattedEmployees,
+  });
 });
 
 // @desc    Get employee by ID
