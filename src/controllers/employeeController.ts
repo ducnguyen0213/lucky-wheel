@@ -231,6 +231,14 @@ const deleteEmployee = asyncHandler(async (req: Request, res: Response) => {
   }
 });
 
+// @desc    Delete all employees
+// @route   DELETE /api/employees
+// @access  Private/Admin
+const deleteAllEmployees = asyncHandler(async (req: Request, res: Response) => {
+  await Employee.deleteMany({});
+  res.status(200).json({ message: 'Tất cả nhân viên đã được xóa thành công' });
+});
+
 // @desc    Verify employee by code
 // @route   GET /api/employees/verify/:employeeCode
 // @access  Public
@@ -402,6 +410,7 @@ export {
   getEmployee,
   updateEmployee,
   deleteEmployee,
+  deleteAllEmployees,
   verifyEmployee,
   importEmployees,
 }; 
